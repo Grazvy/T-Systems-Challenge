@@ -16,3 +16,10 @@ model.value_function = pyo.Param(model.customers, initialize={"id1": 5,"id2": 5}
 model.customer_customer = pyo.Var(model.customers, model.customers, within=pyo.Binary, doc="x_cc")
 model.vehicle_customer = pyo.Var(model.vehicles, model.customers, within=pyo.Binary, doc="x_vc")
 model.waiting_time = pyo.Var(model.customers, within=pyo.NonNegativeIntegers, doc="w")
+
+
+def vehicle_max_connection(model, vehicle):
+    return sum(model.vehicle_customer[customer] for customer in model.customers) <= 1
+
+
+model.vehicle_max_connection = pyo.Constraint(model.D, model.p, rule=vehicle_max_connection, doc="v_max")
