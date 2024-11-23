@@ -2,6 +2,7 @@ import pyomo.environ as pyo
 import requests
 import json
 import math
+import time
 from utils import calculate_distance
 
 def value(x):
@@ -75,7 +76,6 @@ Solver Logic
 model.customers = pyo.Set(initialize=customer_ids, doc="customers")
 model.vehicles = pyo.Set(initialize=vehicle_ids, doc="vehicles")
 
-
 model.customer_destination_distance = pyo.Param(model.customers, initialize=customer_distances_dict, doc="cd_d") # dist pickup -> dest
 model.next_customer_distance = pyo.Param(model.customers, model.customers, initialize=customer_pair_distances, doc="nc_d") # dist between each customer
 model.vehicle_customer_distance = pyo.Param(model.vehicles, model.customers, initialize=vehicle_customer_distances, doc="vc_d") # dist between each vehicle & customer
@@ -124,3 +124,21 @@ def waiting_time_start(model, customer):
 
 
 model.waiting_time_start = pyo.Constraint(model.customers, rule=waiting_time_start, doc="wt_s")
+
+
+def loss(model):
+    return sum(model.value_function[customer] * model.waiting_time[customer] for customer in model.customers)
+
+
+model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
+
+start_time = time.time()
+
+result = opt.solve(model)
+
+end_time = time.time()
+elapsed_time = end_time - start_time
+minutes = int(elapsed_time // 60)
+seconds = int(elapsed_time % 60)
+
+print(f"\n{minutes}:{seconds}")
