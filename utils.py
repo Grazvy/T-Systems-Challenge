@@ -1,5 +1,6 @@
 import math
-
+import matplotlib.pyplot as plt
+import pyomo.environ as pyo
 
 def calculate_remaining_travel_time(vehicle_coord_x, vehicle_coord_y, customer_coord_x, customer_coord_y, speed):
     """
@@ -50,3 +51,16 @@ def calculate_distance(lat1, lon1, lat2, lon2):
     # Distance in meters
     distance = 6371000 * c
     return distance
+
+
+def plot_distance_distribution(model):
+    distances = [pyo.value(model.customer_destination_distance[c]) for c in model.customers]
+
+    # Plot the histogram
+    plt.figure(figsize=(8, 5))
+    plt.hist(distances, bins=5, edgecolor="black", color="skyblue", alpha=0.7)
+    plt.title("Distribution of Customer Destination Distances")
+    plt.xlabel("Distance")
+    plt.ylabel("Frequency")
+    plt.grid(axis="y", linestyle="--", alpha=0.7)
+    plt.show()
