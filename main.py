@@ -3,11 +3,16 @@ import requests
 import json
 import math
 from utils import calculate_distance
+from itertools import chain, combinations
 
 def value(x):
     if x <= 0:
         raise ValueError("x cannot be negative")
     return x * math.log2(x)
+
+def powerset(iterable):
+    s = list(iterable)
+    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
 
 model = pyo.ConcreteModel(name="Scheduler")
 opt = pyo.SolverFactory('appsi_highs')      # glpk, cbc, appsi_highs
@@ -64,6 +69,9 @@ for j, vehicle_id in enumerate(vehicle_ids):
 
 # get value of customer path lengths
 customer_values_dict = {cid: value(val) for cid, val in zip(customer_ids, customer_distances)}
+
+# customer powerset
+customer_powerset = [x for x in list(powerset(customer_ids)) if len(x) > 1]
 
 # launch scenario
 r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}")
