@@ -19,7 +19,14 @@ model.waiting_time = pyo.Var(model.customers, within=pyo.NonNegativeIntegers, do
 
 
 def vehicle_max_connection(model, vehicle):
-    return sum(model.vehicle_customer[customer] for customer in model.customers) <= 1
+    return sum(model.vehicle_customer[vehicle, customer] for customer in model.customers) <= 1
 
 
-model.vehicle_max_connection = pyo.Constraint(model.D, model.p, rule=vehicle_max_connection, doc="v_max")
+model.vehicle_max_connection = pyo.Constraint(model.vehicles, rule=vehicle_max_connection, doc="v_max")
+
+
+def customer_max_connection(model, customer1):
+    return sum(model.customer_customer[customer1, customer2] for customer2 in model.customers) <= 1
+
+
+model.customer_max_connection = pyo.Constraint(model.customers, rule=customer_max_connection, doc="c_max")
