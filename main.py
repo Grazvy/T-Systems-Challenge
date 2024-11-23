@@ -6,18 +6,21 @@ import time
 from utils import calculate_distance
 from itertools import chain, combinations
 
+
 def value(x):
     if x <= 0:
         raise ValueError("x cannot be negative")
     return x * math.log2(x)
 
+
 def powerset(iterable):
     s = list(iterable)
-    return chain.from_iterable(combinations(s, r) for r in range(len(s)+1))
+    return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
 
 model = pyo.ConcreteModel(name="Scheduler")
-opt = pyo.SolverFactory('appsi_highs')      # glpk, cbc, appsi_highs
-opt.options["threads"] = 1
+opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
+opt.options["threads"] = 32
 
 """
 Simulation Initialization
@@ -31,8 +34,8 @@ scenario_id = r_json["id"]
 r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
 r_json = json.loads(r.content.decode())
 
-customers = r_json["scenario"]["customers"] # [i]["id"] for i = {0,...,n} for n customers
-vehicles = r_json["scenario"]["vehicles"] # [j]["id"] for j = {0,...,m} for m vehicles
+customers = r_json["scenario"]["customers"]  # [i]["id"] for i = {0,...,n} for n customers
+vehicles = r_json["scenario"]["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
 
 customers_coordX = [c["coordX"] for c in customers]
 customers_coordY = [c["coordY"] for c in customers]
@@ -46,7 +49,8 @@ customer_ids = [c["id"] for c in customers]
 vehicle_ids = [v["id"] for v in vehicles]
 
 # calculate distances between dest and src for each customer
-customer_distances = [calculate_distance(x1, y1, x2, y2) for x1, y1, x2, y2 in zip(customers_coordX, customers_coordY, customers_destX, customers_destY)]
+customer_distances = [calculate_distance(x1, y1, x2, y2) for x1, y1, x2, y2 in
+                      zip(customers_coordX, customers_coordY, customers_destX, customers_destY)]
 customer_distances_dict = {cid: dist for cid, dist in zip(customer_ids, customer_distances)}
 
 # calculate distances between dest. of first customer and source of second customer for each pair of customers
@@ -83,13 +87,20 @@ Solver Logic
 
 model.customers = pyo.Set(initialize=customer_ids, doc="customers")
 model.vehicles = pyo.Set(initialize=vehicle_ids, doc="vehicles")
+model.valid_pairs = pyo.Set(dimen=2,
+                            initialize=lambda m: [(i, j) for i in model.customers for j in model.customers if i != j],
+                            doc="valid pairs")
 
-model.customer_destination_distance = pyo.Param(model.customers, initialize=customer_distances_dict, doc="cd_d") # dist pickup -> dest
-model.next_customer_distance = pyo.Param(model.customers, model.customers, initialize=customer_pair_distances, doc="nc_d") # dist between each customer
-model.vehicle_customer_distance = pyo.Param(model.vehicles, model.customers, initialize=vehicle_customer_distances, doc="vc_d") # dist between each vehicle & customer
-model.value_function = pyo.Param(model.customers, initialize=customer_values_dict, doc="v") # some value based on customer path length (n log n)
+model.customer_destination_distance = pyo.Param(model.customers, initialize=customer_distances_dict,
+                                                doc="cd_d")  # dist pickup -> dest
+model.next_customer_distance = pyo.Param(model.valid_pairs, initialize=customer_pair_distances,
+                                         doc="nc_d")  # dist between each customer
+model.vehicle_customer_distance = pyo.Param(model.vehicles, model.customers, initialize=vehicle_customer_distances,
+                                            doc="vc_d")  # dist between each vehicle & customer
+model.value_function = pyo.Param(model.customers, initialize=customer_values_dict,
+                                 doc="v")  # some value based on customer path length (n log n)
 
-model.customer_customer = pyo.Var(model.customers, model.customers, within=pyo.Binary, doc="x_cc")
+model.customer_customer = pyo.Var(model.valid_pairs, within=pyo.Binary, doc="x_cc")
 model.vehicle_customer = pyo.Var(model.vehicles, model.customers, within=pyo.Binary, doc="x_vc")
 model.waiting_time = pyo.Var(model.customers, within=pyo.NonNegativeIntegers, doc="w")
 
@@ -102,36 +113,63 @@ model.vehicle_max_connection = pyo.Constraint(model.vehicles, rule=vehicle_max_c
 
 
 def customer_max_connection(model, customer1):
-    return sum(model.customer_customer[customer1, customer2] for customer2 in model.customers if customer2 != customer1) <= 1
+    return sum(
+        model.customer_customer[customer1, customer2] for customer2 in model.customers if customer2 != customer1) <= 1
 
 
 model.customer_max_connection = pyo.Constraint(model.customers, rule=customer_max_connection, doc="c_max")
 
 
 def gets_picked_up_once(model, customer1):
-    return (sum(model.customer_customer[customer2, customer1] for customer2 in model.customers if customer2 != customer1) +
+    return (sum(
+        model.customer_customer[customer2, customer1] for customer2 in model.customers if customer2 != customer1) +
             sum(model.vehicle_customer[vehicle, customer1] for vehicle in model.vehicles)) == 1
 
 
 model.gets_picked_up_once = pyo.Constraint(model.customers, rule=gets_picked_up_once, doc="pickup")
 
-
-def waiting_time_chained(model, customer1):
-    return ((sum(model.customer_customer[customer2, customer1] *
-                (model.waiting_time[customer2] + model.customer_destination_distance[customer2] +
-                 model.next_customer_distance[customer2, customer1]) for customer2 in model.customers if customer2 != customer1))
-            <= model.waiting_time[customer1])
+def waiting_time_chained(model, customer1, customer2):
+    return (model.waiting_time[customer2] + model.customer_destination_distance[customer2] +
+            model.next_customer_distance[customer2, customer1]) <= model.waiting_time[customer1] + (1 - model.customer_customer[customer2, customer1]) * 10000000
 
 
-model.waiting_time_chained = pyo.Constraint(model.customers, rule=waiting_time_chained, doc="wt_c")
+model.waiting_time_chained = pyo.Constraint(model.valid_pairs, rule=waiting_time_chained, doc="wt_c")
 
 
 def waiting_time_start(model, customer):
     return (sum(model.vehicle_customer[vehicle, customer]
-                * model.vehicle_customer_distance[vehicle, customer] for vehicle in model.vehicles)) <= model.waiting_time[customer]
+                * model.vehicle_customer_distance[vehicle, customer] for vehicle in model.vehicles)) <= \
+        model.waiting_time[customer]
 
 
 model.waiting_time_start = pyo.Constraint(model.customers, rule=waiting_time_start, doc="wt_s")
+
+
+def subset_elimination(model, subset):
+    return sum(sum(model.customer_customer[customer1, customer2] for customer2 in subset if customer1 != customer2)
+               for customer1 in subset) <= len(subset) - 1
+
+
+model.subset_elimination_constraints = pyo.ConstraintList()
+
+sorted_sets = {}
+
+for set in customer_powerset:
+    if len(set) in sorted_sets:
+        sorted_sets[len(set)].append(set)
+
+    else:
+        sorted_sets[len(set)] = [set]
+
+for key, value in sorted_sets.items():
+    setattr(model, f'set_dim_{key}', pyo.Set(dimen=key, initialize=value))
+
+
+for key in sorted_sets:
+    set = getattr(model, f'set_dim_{key}')
+    for subset in set:
+        model.subset_elimination_constraints.add(subset_elimination(model, subset))
+
 
 
 def loss(model):
@@ -140,8 +178,9 @@ def loss(model):
 
 model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
 
-start_time = time.time()
 
+start_time = time.time()
+model.pprint()
 result = opt.solve(model)
 
 end_time = time.time()
