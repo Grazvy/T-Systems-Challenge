@@ -130,7 +130,7 @@ model.gets_picked_up_once = pyo.Constraint(model.customers, rule=gets_picked_up_
 
 def waiting_time_chained(model, customer1, customer2):
     return (model.waiting_time[customer2] + model.customer_destination_distance[customer2] +
-            model.next_customer_distance[customer2, customer1]) <= model.waiting_time[customer1] + (1 - model.customer_customer[customer2, customer1]) * 10000000
+            model.next_customer_distance[customer2, customer1]) <= model.waiting_time[customer1] + (1 - model.customer_customer[customer2, customer1]) * 100000
 
 
 model.waiting_time_chained = pyo.Constraint(model.valid_pairs, rule=waiting_time_chained, doc="wt_c")
@@ -180,8 +180,8 @@ model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
 
 
 start_time = time.time()
-model.pprint()
-result = opt.solve(model)
+model.write('model.lp')
+result = opt.solve(model, load_solutions=False)
 
 end_time = time.time()
 elapsed_time = end_time - start_time
