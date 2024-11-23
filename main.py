@@ -6,7 +6,6 @@ import time
 from utils import calculate_distance
 from itertools import chain, combinations
 
-
 def value(x):
     if x <= 0:
         raise ValueError("x cannot be negative")
@@ -47,6 +46,15 @@ vehicles_coordY = [v["coordY"] for v in vehicles]
 
 customer_ids = [c["id"] for c in customers]
 vehicle_ids = [v["id"] for v in vehicles]
+
+def check_radius_vc(cid, vid, radius):
+    c_index = customer_ids.index(cid)
+    v_index = vehicle_ids.index(vid)
+    return calculate_distance(customers_coordX[c_index], customers_coordY[c_index], vehicle_coordX[v_index], vehicle_coordY[v_index]) < radius
+
+def check_radius_cc(cid, radius):
+    c_index = customer_ids.index(cid)
+    return calculate_distance(customers_coordX[c_index], customers_coordY[c_index], customers_destX[c_index], customers_destY[c_index]) < radius
 
 # calculate distances between dest and src for each customer
 customer_distances = [calculate_distance(x1, y1, x2, y2) for x1, y1, x2, y2 in
