@@ -37,7 +37,7 @@ def calculate_score(wait_times, distances_dict):
 
     return score
 
-collect_data = True
+collect_data = False
 speed = 0.001
 amount_v = 5
 amount_c = 10
@@ -336,7 +336,19 @@ for vehicle in model.vehicles:
             starts.append((vehicle, customer))
 
 
-#wait_times = update_scenario(starts, connections, scenario_id, speed)
+print("Starts (Vehicle -> Customer):")
+for s in starts:
+    print(s[0][:6] + " --> " + s[1][:6])
+    
+print()
+    
+print("Connections (Customer -> Customer):")
+for c in connections:
+    print(c[0][:6] + " --> " + c[1][:6])
+
+print()
+
+wait_times = update_scenario(starts, connections, scenario_id, speed)
 
 # timing
 end_time = time.time()

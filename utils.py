@@ -119,7 +119,7 @@ def plot_distance_distribution(model):
     
 def update_scenario(starts, connections, scenario_id, speed):
     # update scenario
-    print("starting simulation")
+    print("Starting Simulation...")
     payload = {"vehicles":[{"id":x, "customerId":y} for (x,y) in starts]}
     payload_json = json.dumps(payload)
     r = requests.put(f"http://localhost:8090/Scenarios/update_scenario/{scenario_id}", json=json.loads(payload_json))
@@ -129,6 +129,11 @@ def update_scenario(starts, connections, scenario_id, speed):
     # this counts as a queue, and the driver responsible will go through the queue until finished
     # if no one follows in the queue, we're done
     updated_vehicles = r_json["updatedVehicles"]
+    
+    print("Updated vehicles (Vehicle -> Customer):")
+    for v in updated_vehicles:
+        print(f"{v["id"][:6]} --> {v["customerId"][:6]} (ETA: {v["remainingTravelTime"]}s)")
+    
     updated_vehicles_times = [{v["id"]: v["remainingTravelTime"]} for v in updated_vehicles]
     queues = {} # this will contain the remaining vehicle paths...
     time_elapsed = 0
@@ -171,12 +176,15 @@ def update_scenario(starts, connections, scenario_id, speed):
                         if r_v["id"] == vehicle_id:
                             if r_v["remainingTravelTime"] is not None:
                                 vehicle_time[vehicle_id] += r_v["remainingTravelTime"]
+                                # if vehicle_time[vehicle_id] > 15:
+                                #     print(f"Arrived, new ETA {vehicle_id[:6]}: {vehicle_time[vehicle_id]}s")
                                 break
                         
                     if vehicle_time[vehicle_id] != 0:
                         break
                     
                     if not vehicle_id in queues or not queues[vehicle_id]:
+                        print(f"Finished: {vehicle_id[:6]}")
                         updated_vehicles_times.remove(vehicle_time)
                     else:
                         next_customer = queues[vehicle_id][0]
@@ -188,6 +196,11 @@ def update_scenario(starts, connections, scenario_id, speed):
                         r_json = json.loads(r.content.decode())     
                         
                         new_updated = r_json["updatedVehicles"]
+                        
+                        print("Updated vehicles (Vehicle -> Customer):")
+                        for v in new_updated:
+                            print(f"{v["id"][:6]} --> {v["customerId"][:6]} (ETA: {v["remainingTravelTime"]}s)")
+                        
                         new_wait_times = [{v["customerId"]: v["remainingTravelTime"]} for v in new_updated]
                         for item in new_wait_times:
                             for _, val in item.items():
@@ -209,7 +222,9 @@ def update_scenario(starts, connections, scenario_id, speed):
         for dict in wait_times:
             for id, t in dict.items():
                 result[id] = t
-    print("done")
+    print("Done (Customer, Total Wait Time):")
+    for x in result.items():
+        print(x)
     return result
 
 def update_scenario_dist(payload, scenario_id, speed):
