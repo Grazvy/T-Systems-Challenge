@@ -37,7 +37,7 @@ def calculate_score(wait_times, distances_dict):
 
     return score
 
-collect_data = False
+collect_data = True
 speed = 0.001
 amount_v = 5
 amount_c = 10
@@ -354,7 +354,7 @@ if collect_data:
     opt_scores = []
     rnd_scores = []
 
-    for i in range(10):
+    for i in range(20):
         """
         Update scenario
         """
@@ -467,7 +467,7 @@ if collect_data:
         #print(wait_times)
         #print(f"solver: {calculate_score(opt, customer_distances_dict)}, random: {calculate_score(rnd, customer_distances_dict)}")
 
-    for i in range(10):
+    for i in range(20):
         """
         Update scenario
         """
