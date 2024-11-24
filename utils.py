@@ -176,8 +176,7 @@ def update_scenario(starts, connections, scenario_id, speed):
                         if r_v["id"] == vehicle_id:
                             if r_v["remainingTravelTime"] is not None:
                                 vehicle_time[vehicle_id] += r_v["remainingTravelTime"]
-                                # if vehicle_time[vehicle_id] > 15:
-                                #     print(f"Arrived, new ETA {vehicle_id[:6]}: {vehicle_time[vehicle_id]}s")
+                                # print(f"{vehicle_id[:6]} with {r_v["customerId"][:6]} arrived, new ETA: {vehicle_time[vehicle_id]}s")
                                 break
                         
                     if vehicle_time[vehicle_id] != 0:
@@ -222,6 +221,8 @@ def update_scenario(starts, connections, scenario_id, speed):
         for dict in wait_times:
             for id, t in dict.items():
                 result[id] = t
+    
+    print()
     print("Done (Customer, Total Wait Time):")
     for x in result.items():
         print(x)
