@@ -3,7 +3,7 @@ import requests
 import json
 import math
 import time
-from utils import calculate_distance, plot_distance_distribution
+from utils import calculate_distance, plot_distance_distribution, update_scenario
 from itertools import chain, combinations
 
 def _value(x):
@@ -17,7 +17,7 @@ def powerset(iterable):
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
 
-
+speed = 0.001
 model = pyo.ConcreteModel(name="Scheduler")
 opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
 opt.options["threads"] = 1
@@ -95,6 +95,9 @@ customer_values_dict = {cid: _value(val) for cid, val in zip(customer_ids, custo
 
 # customer powerset
 customer_powerset = [x for x in list(powerset(customer_ids)) if len(x) > 1]
+
+# launch scenario
+r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
 
 """
 Solver Logic
@@ -240,6 +243,10 @@ print(connections)
 print(starts)
 print(pyo.value(model.loss))
 
+wait_times = update_scenario(starts, connections, scenario_id, speed)
+print(wait_times)
+
+# timing
 end_time = time.time()
 elapsed_time = end_time - start_time
 minutes = int(elapsed_time // 60)
