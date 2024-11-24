@@ -193,7 +193,7 @@ def update_scenario(starts, connections, scenario_id, speed):
 
         result = {}
         for dict in wait_times:
-            for id, time in dict:
-                result[id] = time
+            for id, t in dict:
+                result[id] = t
 
     return result
