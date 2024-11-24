@@ -212,10 +212,10 @@ def update_scenario_dist(payload, scenario_id, speed):
         else:
             queue.append(entry)
 
-    print("Filtered List:", filtered_list)
-    print()
-    print("Queue:", queue)
-    print()
+    #print("Filtered List:", filtered_list)
+    #print()
+    #print("Queue:", queue)
+    #print()
     
     actual_payload = {"vehicles": filtered_list}
     

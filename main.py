@@ -391,6 +391,7 @@ if True:
         model = pyo.ConcreteModel(name="Scheduler")
         opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
         exceptions = []
+        speed = 0.0001
 
         build_model(model)
 
@@ -436,14 +437,13 @@ if True:
 
         r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
         r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
-        wait_times = update_scenario(starts, connections, scenario_id, speed)
+        opt = update_scenario(starts, connections, scenario_id, speed)
 
         #print(wait_times)
-        print(f"solver: {calculate_score(wait_times, customer_distances_dict)}, random: {0}")
-
         random_payload = randomized_payload(vehicles, customers)
 
         r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
         r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
-        #wait_times = update_scenario(starts, connections, scenario_id, speed)
+        rnd = update_scenario_dist(random_payload, scenario_id, speed)
 
+        print(f"solver: {calculate_score(opt, customer_distances_dict)}, random: {calculate_score(rnd, customer_distances_dict)}")
