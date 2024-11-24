@@ -42,7 +42,7 @@ def distance_optimize(vehicles, customers):
     # initialize
     for i in range(len(result)):
         for j in range(len(result[i])):
-            payload["vehicles"].append({"id": vehicles[i]["id"], "customerId": customers[result[i][0]]["id"]})
+            payload["vehicles"].append({"id": vehicles[i]["id"], "customerId": customers[result[i][j]]["id"]})
 
     return payload
 
