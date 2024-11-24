@@ -3,19 +3,23 @@ import requests
 import json
 import math
 import time
-from utils import calculate_distance, plot_distance_distribution, update_scenario
+from utils import calculate_distance, randomized_payload, update_scenario
 from itertools import chain, combinations
 
 def _value(x):
     if x < 0:
         raise ValueError("x cannot be negative")
 
-    return max(200 + 1/10 * x + 1/40 * (1/50 * x)^2, 2000)
+    return max(200 + 1/10 * x + 1/40 * (1/50 * x)**2, 2000)
 
 
 def powerset(iterable):
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+def calculate_score(wait_times, distances_dict):
+        for wait_time in wait_times:
+            pass
 
 speed = 0.001
 model = pyo.ConcreteModel(name="Scheduler")
@@ -205,7 +209,6 @@ for key in sorted_sets:
             continue
 
 
-
 def loss(model):
     return sum(model.value_function[customer] * model.waiting_time[customer] +
                model.value_function[customer] * model.joker[customer] * 10000 for customer in model.customers)
@@ -239,12 +242,8 @@ for vehicle in model.vehicles:
         if math.isclose(model.vehicle_customer[vehicle, customer].value, 1, rel_tol=1e-9):
             starts.append((vehicle, customer))
 
-print(connections)
-print(starts)
-print(pyo.value(model.loss))
 
-wait_times = update_scenario(starts, connections, scenario_id, speed)
-print(wait_times)
+#wait_times = update_scenario(starts, connections, scenario_id, speed)
 
 # timing
 end_time = time.time()
@@ -266,12 +265,8 @@ if True:
         scenario_json = r_json
         scenario_id = r_json["id"]
 
-        # initialize scenario (default values)
-        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
-        r_json = json.loads(r.content.decode())
-
-        customers = r_json["scenario"]["customers"]  # [i]["id"] for i = {0,...,n} for n customers
-        vehicles = r_json["scenario"]["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
+        customers = r_json["customers"]  # [i]["id"] for i = {0,...,n} for n customers
+        vehicles = r_json["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
 
         customers_coordX = [c["coordX"] for c in customers]
         customers_coordY = [c["coordY"] for c in customers]
@@ -412,13 +407,19 @@ if True:
                 if math.isclose(model.vehicle_customer[vehicle, customer].value, 1, rel_tol=1e-9):
                     starts.append((vehicle, customer))
 
-        print(connections)
-        print(starts)
-        print(pyo.value(model.loss))
-        
-print(r_json)
-# r_json = json.loads(r.content.decode())
-# r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
-# r_json = json.loads(r.content.decode())
-# get scenario_id...
-# r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        #print(connections)
+        #print(starts)
+
+        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
+        r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        wait_times = update_scenario(starts, connections, scenario_id, speed)
+
+        print(wait_times)
+        print(f"opt: {pyo.value(model.loss)}, sim: {calculate_score(wait_times, customer_distances_dict)}")
+
+        random_payload = randomized_payload(vehicles, customers)
+
+        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
+        r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        #wait_times = update_scenario(starts, connections, scenario_id, speed)
+

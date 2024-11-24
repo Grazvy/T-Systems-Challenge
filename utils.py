@@ -170,8 +170,13 @@ def update_scenario(starts, connections, scenario_id, speed):
         if not updated_vehicles_times:
             break
         
-        print(updated_vehicles_times)
+        #print(updated_vehicles_times)
         time_elapsed += 1
         time.sleep(speed * 1.5) # safety net
-    
-    return wait_times
+
+        result = {}
+        for dict in wait_times:
+            for id, time in dict:
+                result[id] = time
+
+    return result
