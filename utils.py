@@ -74,21 +74,35 @@ def randomized_payload(cars, customers):
 
 
 def visualize_compare_cars(len_cars, results):
-    #for now: one car less for every result
-    #results go from full car setup to lowest car setup
+    #for now: one car more for every result
+    #results go from smallest car setup to highest car setup
 
+    median = [0 for _ in range(len(results[0]))]
     categories = []
-    for i in range(len(results)):
-        categories.append(len_cars - i)
+
+    #I have made a distinction whether we ran multiple randomized simulations for each number of cars so we get more significant results
+    #this is multi simulation with every inner list the results for all car nums
+    if isinstance(results[0], list):
+        for i in range(len(results)):
+            for j in range(len(results[0])):
+                median[j] += results[i][j]
+        median = [x / len(results) for x in median]
+        for i in range(len(results[0])):
+            categories.append(len_cars - i)
+
+    #single data case
+    else:
+        categories = []
+        for i in range(len(results)):
+            categories.append(len_cars - i)
+        median = results
 
     print(categories)
-
-    plt.bar(categories, results)
-
+    plt.bar(categories, median)
 
     plt.xlabel('Number of Cars')
     plt.ylabel('Total Wait Time')
-    plt.title('Customer Dissatisfaction')
+    plt.title('Customer Satisfaction')
     plt.show()
 
 def plot_distance_distribution(model):
