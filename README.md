@@ -1,3 +1,7 @@
+## Usage
+- `pip install -r requirements.txt`
+- `python3 main.py`
+
 ## Inspiration
 Nobody likes waiting - that's something both the consumer and the company have in common. At best, it wastes time. At worst, it wastes money. This is why flotteFlotte allows companies to easily and automatically manage and monitor a fleet of self-driving vehicles, maximizing productivity on both sides by keeping wait times low and prioritizing longer routes to keep the taxis always on the go. 
 
