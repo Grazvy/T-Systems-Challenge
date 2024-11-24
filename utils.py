@@ -105,6 +105,7 @@ def plot_distance_distribution(model):
     
 def update_scenario(starts, connections, scenario_id, speed):
     # update scenario
+    print("starting simulation")
     payload = {"vehicles":[{"id":x, "customerId":y} for (x,y) in starts]}
     payload_json = json.dumps(payload)
     r = requests.put(f"http://localhost:8090/Scenarios/update_scenario/{scenario_id}", json=json.loads(payload_json))
@@ -193,7 +194,7 @@ def update_scenario(starts, connections, scenario_id, speed):
 
         result = {}
         for dict in wait_times:
-            for id, t in dict:
+            for id, t in dict.items():
                 result[id] = t
-
+    print("done")
     return result
