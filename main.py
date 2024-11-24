@@ -3,12 +3,8 @@ import requests
 import json
 import math
 import time
-<<<<<<< HEAD
-from utils import calculate_distance, randomized_payload, update_scenario
-=======
 from utils import calculate_distance, plot_distance_distribution, update_scenario, update_scenario_dist, randomized_payload
 from testing import distance_optimize
->>>>>>> 557ef61 (add dist update func)
 from itertools import chain, combinations
 
 def _value(x):
