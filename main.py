@@ -43,8 +43,8 @@ amount_v = 5
 amount_c = 10
 model = pyo.ConcreteModel(name="Scheduler")
 opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
-opt.options["threads"] = 32
-radius = 1000
+opt.options["threads"] = 1
+radius = 2000
 exceptions = []
 
 """
