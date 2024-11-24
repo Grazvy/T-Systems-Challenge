@@ -214,6 +214,7 @@ def update_scenario(starts, connections, scenario_id, speed):
 
 def update_scenario_dist(payload, scenario_id, speed):
     # build queues
+    print("start simulation")
     vehicles = payload["vehicles"]
     seen_ids = set()
     filtered_list = []
@@ -236,8 +237,8 @@ def update_scenario_dist(payload, scenario_id, speed):
     # update scenario
     payload_json = json.dumps(actual_payload)
     r = requests.put(f"http://localhost:8090/Scenarios/update_scenario/{scenario_id}", json=json.loads(payload_json))
-    r_json = json.loads(r.content.decode())  
-    
+    r_json = json.loads(r.content.decode())
+
     updated_vehicles = r_json["updatedVehicles"]
     updated_vehicles_times = [{v["id"]: v["remainingTravelTime"]} for v in updated_vehicles]
     time_elapsed = 0
@@ -250,9 +251,9 @@ def update_scenario_dist(payload, scenario_id, speed):
             queues[entry['id']] = []
         queues[entry['id']].append(entry['customerId'])
     
-    print(updated_vehicles_times)
-    print()
-    print(wait_times)
+    #print(updated_vehicles_times)
+    #print()
+    #print(wait_times)
     
     while True:
         # decrement all...
@@ -305,9 +306,14 @@ def update_scenario_dist(payload, scenario_id, speed):
 
         if not updated_vehicles_times:
             break
-        
-        print(updated_vehicles_times)
+
         time_elapsed += 1
         time.sleep(speed * 1.5) # safety net
-    
-    return wait_times
+
+    result = {}
+    for dict in wait_times:
+        for id, t in dict.items():
+            result[id] = t
+
+    print("done")
+    return result

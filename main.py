@@ -22,6 +22,14 @@ def powerset(iterable):
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
 
+def count(set):
+    result = 0
+    for s1 in set:
+        for s2 in set:
+            if include_pair(s1, s2):
+                result += 1
+    return result
+
 def calculate_score(wait_times, distances_dict):
     score = 0
     for id, t in wait_times.items():
@@ -29,18 +37,21 @@ def calculate_score(wait_times, distances_dict):
 
     return score
 
+collect_data = False
 speed = 0.001
+amount_v = 5
+amount_c = 10
 model = pyo.ConcreteModel(name="Scheduler")
 opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
-opt.options["threads"] = 1
-radius = 2000
+opt.options["threads"] = 32
+radius = 1000
 exceptions = []
 
 """
 Simulation Initialization
 """
 # create scenario
-r = requests.post("http://localhost:8080/scenario/create")
+r = requests.post(f"http://localhost:8080/scenario/create?numberOfVehicles={amount_v}&numberOfCustomers={amount_c}")
 r_json = json.loads(r.content.decode())
 scenario_id = r_json["id"]
 
@@ -141,6 +152,8 @@ def build_model(model):
     for key in sorted_sets:
         set = getattr(model, f'set_dim_{key}')
         for subset in set:
+            if count(subset) < len(subset):
+                continue
             try:
                 model.subset_elimination_constraints.add(subset_elimination(model, subset))
             except ValueError:
@@ -279,6 +292,9 @@ for key, value in sorted_sets.items():
 for key in sorted_sets:
     set = getattr(model, f'set_dim_{key}')
     for subset in set:
+        if count(subset) < len(subset):
+            continue
+
         try:
             model.subset_elimination_constraints.add(subset_elimination(model, subset))
         except ValueError:
@@ -294,9 +310,10 @@ model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
 
 
 start_time = time.time()
-#model.write('model.lp')
-result = opt.solve(model)
+if not collect_data:
+    model.write('_model.lp')
 
+result = opt.solve(model)
 
 
 for joker in model.joker:
@@ -327,16 +344,23 @@ elapsed_time = end_time - start_time
 minutes = int(elapsed_time // 60)
 seconds = int(elapsed_time % 60)
 
-#print(f"\n{minutes}:{seconds}")
+if not collect_data:
+    print(f"\n{minutes}:{seconds}")
 
-if True:
+if collect_data:
+    speed = 0.0001
+    amount_v = 5
+    amount_c = 10
+    opt_scores = []
+    rnd_scores = []
+
     for i in range(10):
         """
         Update scenario
         """
 
         # create scenario
-        r = requests.post("http://localhost:8080/scenario/create")
+        r = requests.post(f"http://localhost:8080/scenario/create?numberOfVehicles={amount_v}&numberOfCustomers={amount_c}")
         r_json = json.loads(r.content.decode())
         scenario_json = r_json
         scenario_id = r_json["id"]
@@ -391,7 +415,6 @@ if True:
         model = pyo.ConcreteModel(name="Scheduler")
         opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
         exceptions = []
-        speed = 0.0001
 
         build_model(model)
 
@@ -439,11 +462,47 @@ if True:
         r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
         opt = update_scenario(starts, connections, scenario_id, speed)
 
+        opt_scores.append(calculate_score(opt, customer_distances_dict))
+
         #print(wait_times)
+        #print(f"solver: {calculate_score(opt, customer_distances_dict)}, random: {calculate_score(rnd, customer_distances_dict)}")
+
+    for i in range(10):
+        """
+        Update scenario
+        """
+
+        # create scenario
+        r = requests.post(f"http://localhost:8080/scenario/create?numberOfVehicles={amount_v}&numberOfCustomers={amount_c}")
+        r_json = json.loads(r.content.decode())
+        scenario_json = r_json
+        scenario_id = r_json["id"]
+
+        customers = r_json["customers"]  # [i]["id"] for i = {0,...,n} for n customers
+        vehicles = r_json["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
+
+        customers_coordX = [c["coordX"] for c in customers]
+        customers_coordY = [c["coordY"] for c in customers]
+        customers_destX = [c["destinationX"] for c in customers]
+        customers_destY = [c["destinationY"] for c in customers]
+
+        customer_ids = [c["id"] for c in customers]
+        vehicle_ids = [v["id"] for v in vehicles]
+
+        # calculate distances between dest and src for each customer
+        customer_distances = [calculate_distance(x1, y1, x2, y2) for x1, y1, x2, y2 in
+                              zip(customers_coordX, customers_coordY, customers_destX, customers_destY)]
+        customer_distances_dict = {cid: dist for cid, dist in zip(customer_ids, customer_distances)}
+
         random_payload = randomized_payload(vehicles, customers)
 
         r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
         r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+
         rnd = update_scenario_dist(random_payload, scenario_id, speed)
 
-        print(f"solver: {calculate_score(opt, customer_distances_dict)}, random: {calculate_score(rnd, customer_distances_dict)}")
+        rnd_scores.append(calculate_score(rnd, customer_distances_dict))
+
+    print(opt_scores)
+    print(rnd_scores)
+
