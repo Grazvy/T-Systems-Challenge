@@ -3,19 +3,31 @@ import requests
 import json
 import math
 import time
-from utils import calculate_distance, plot_distance_distribution, update_scenario
+from utils import calculate_distance, plot_distance_distribution, update_scenario, update_scenario_dist, randomized_payload
+from testing import distance_optimize
 from itertools import chain, combinations
+import logging
+
+# Suppress Pyomo logging
+logging.getLogger('pyomo').setLevel(logging.ERROR)
 
 def _value(x):
     if x < 0:
         raise ValueError("x cannot be negative")
 
-    return max(200 + 1/10 * x + 1/40 * (1/50 * x)^2, 2000)
+    return max(200 + 1/10 * x + 1/40 * (1/50 * x)**2, 2000)
 
 
 def powerset(iterable):
     s = list(iterable)
     return chain.from_iterable(combinations(s, r) for r in range(len(s) + 1))
+
+def calculate_score(wait_times, distances_dict):
+    score = 0
+    for id, t in wait_times.items():
+            score += _value(distances_dict[id]) * t
+
+    return score
 
 speed = 0.001
 model = pyo.ConcreteModel(name="Scheduler")
@@ -65,6 +77,76 @@ def include_pair(c1, c2):
         return True
 
     return c1 != c2 and check_radius_cc(c1, c2, radius)
+
+def build_model(model):
+    model.customers = pyo.Set(initialize=customer_ids, doc="customers")
+    model.vehicles = pyo.Set(initialize=vehicle_ids, doc="vehicles")
+    model.valid_pairs = pyo.Set(dimen=2, initialize=lambda m: [(i, j) for i in model.customers for j in model.customers
+                                                               if include_pair(i, j)], doc="valid pairs")
+
+    model.customer_destination_distance = pyo.Param(model.customers, initialize=customer_distances_dict,
+                                                    doc="cd_d")  # dist pickup -> dest
+    model.next_customer_distance = pyo.Param(model.valid_pairs, initialize=customer_pair_distances,
+                                             doc="nc_d")  # dist between each customer
+    model.vehicle_customer_distance = pyo.Param(model.vehicles, model.customers, initialize=vehicle_customer_distances,
+                                                doc="vc_d")  # dist between each vehicle & customer
+    model.value_function = pyo.Param(model.customers, initialize=customer_values_dict,
+                                     doc="v")  # some value based on customer path length (n log n)
+
+    model.customer_customer = pyo.Var(model.valid_pairs, within=pyo.Binary, doc="x_cc")
+    model.vehicle_customer = pyo.Var(model.vehicles, model.customers, within=pyo.Binary, doc="x_vc")
+    model.waiting_time = pyo.Var(model.customers, within=pyo.NonNegativeIntegers, doc="w")
+    model.joker = pyo.Var(model.customers, within=pyo.Binary, doc="j")
+
+    model.vehicle_max_connection = pyo.Constraint(model.vehicles, rule=vehicle_max_connection, doc="v_max")
+
+    model.customer_max_connection = pyo.ConstraintList()
+
+    for customer in model.customers:
+        const = customer_max_connection(model, customer)
+
+        try:
+            model.customer_max_connection.add(const)
+        except ValueError:
+            continue
+
+    model.gets_picked_up_once = pyo.Constraint(model.customers, rule=gets_picked_up_once, doc="pickup")
+
+    model.waiting_time_chained = pyo.ConstraintList()
+
+    for c1, c2 in model.valid_pairs:
+        if include_pair(c2, c1):
+            try:
+                model.waiting_time_chained.add(waiting_time_chained(model, c1, c2))
+            except ValueError:
+                continue
+
+
+    model.waiting_time_start = pyo.Constraint(model.customers, rule=waiting_time_start, doc="wt_s")
+
+    model.subset_elimination_constraints = pyo.ConstraintList()
+
+    sorted_sets = {}
+
+    for set in customer_powerset:
+        if len(set) in sorted_sets:
+            sorted_sets[len(set)].append(set)
+
+        else:
+            sorted_sets[len(set)] = [set]
+
+    for key, value in sorted_sets.items():
+        setattr(model, f'set_dim_{key}', pyo.Set(dimen=key, initialize=value))
+
+    for key in sorted_sets:
+        set = getattr(model, f'set_dim_{key}')
+        for subset in set:
+            try:
+                model.subset_elimination_constraints.add(subset_elimination(model, subset))
+            except ValueError:
+                continue
+
+    model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
 
 # calculate distances between dest and src for each customer
 customer_distances = [calculate_distance(x1, y1, x2, y2) for x1, y1, x2, y2 in
@@ -159,8 +241,6 @@ def waiting_time_chained(model, customer1, customer2):
             model.next_customer_distance[customer1, customer2]) <= model.waiting_time[customer2] + (1 - model.customer_customer[customer1, customer2]) * 100000
 
 
-model.waiting_time_chained = pyo.Constraint(model.valid_pairs, rule=waiting_time_chained, doc="wt_c")
-
 model.waiting_time_chained = pyo.ConstraintList()
 
 for c1, c2 in model.valid_pairs:
@@ -205,7 +285,6 @@ for key in sorted_sets:
             continue
 
 
-
 def loss(model):
     return sum(model.value_function[customer] * model.waiting_time[customer] +
                model.value_function[customer] * model.joker[customer] * 10000 for customer in model.customers)
@@ -239,12 +318,8 @@ for vehicle in model.vehicles:
         if math.isclose(model.vehicle_customer[vehicle, customer].value, 1, rel_tol=1e-9):
             starts.append((vehicle, customer))
 
-print(connections)
-print(starts)
-print(pyo.value(model.loss))
 
-wait_times = update_scenario(starts, connections, scenario_id, speed)
-print(wait_times)
+#wait_times = update_scenario(starts, connections, scenario_id, speed)
 
 # timing
 end_time = time.time()
@@ -252,7 +327,7 @@ elapsed_time = end_time - start_time
 minutes = int(elapsed_time // 60)
 seconds = int(elapsed_time % 60)
 
-print(f"\n{minutes}:{seconds}")
+#print(f"\n{minutes}:{seconds}")
 
 if True:
     for i in range(10):
@@ -266,12 +341,8 @@ if True:
         scenario_json = r_json
         scenario_id = r_json["id"]
 
-        # initialize scenario (default values)
-        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
-        r_json = json.loads(r.content.decode())
-
-        customers = r_json["scenario"]["customers"]  # [i]["id"] for i = {0,...,n} for n customers
-        vehicles = r_json["scenario"]["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
+        customers = r_json["customers"]  # [i]["id"] for i = {0,...,n} for n customers
+        vehicles = r_json["vehicles"]  # [j]["id"] for j = {0,...,m} for m vehicles
 
         customers_coordX = [c["coordX"] for c in customers]
         customers_coordY = [c["coordY"] for c in customers]
@@ -321,104 +392,58 @@ if True:
         opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
         exceptions = []
 
-        model.customers = pyo.Set(initialize=customer_ids, doc="customers")
-        model.vehicles = pyo.Set(initialize=vehicle_ids, doc="vehicles")
-        model.valid_pairs = pyo.Set(dimen=2, initialize=lambda m: [(i, j) for i in model.customers for j in model.customers
-                                                                   if include_pair(i, j)], doc="valid pairs")
-
-        model.customer_destination_distance = pyo.Param(model.customers, initialize=customer_distances_dict,
-                                                        doc="cd_d")  # dist pickup -> dest
-        model.next_customer_distance = pyo.Param(model.valid_pairs, initialize=customer_pair_distances,
-                                                 doc="nc_d")  # dist between each customer
-        model.vehicle_customer_distance = pyo.Param(model.vehicles, model.customers, initialize=vehicle_customer_distances,
-                                                    doc="vc_d")  # dist between each vehicle & customer
-        model.value_function = pyo.Param(model.customers, initialize=customer_values_dict,
-                                         doc="v")  # some value based on customer path length (n log n)
-
-        model.customer_customer = pyo.Var(model.valid_pairs, within=pyo.Binary, doc="x_cc")
-        model.vehicle_customer = pyo.Var(model.vehicles, model.customers, within=pyo.Binary, doc="x_vc")
-        model.waiting_time = pyo.Var(model.customers, within=pyo.NonNegativeIntegers, doc="w")
-        model.joker = pyo.Var(model.customers, within=pyo.Binary, doc="j")
-
-        model.vehicle_max_connection = pyo.Constraint(model.vehicles, rule=vehicle_max_connection, doc="v_max")
-
-        model.customer_max_connection = pyo.ConstraintList()
-
-        for customer in model.customers:
-            const = customer_max_connection(model, customer)
-
-            try:
-                model.customer_max_connection.add(const)
-            except ValueError:
-                continue
-
-
-        model.gets_picked_up_once = pyo.Constraint(model.customers, rule=gets_picked_up_once, doc="pickup")
-
-        model.waiting_time_chained = pyo.Constraint(model.valid_pairs, rule=waiting_time_chained, doc="wt_c")
-
-        model.waiting_time_chained = pyo.ConstraintList()
-
-        for c1, c2 in model.valid_pairs:
-            if include_pair(c2, c1):
-                model.waiting_time_chained.add(waiting_time_chained(model, c1, c2))
-
-        model.waiting_time_start = pyo.Constraint(model.customers, rule=waiting_time_start, doc="wt_s")
-
-        model.subset_elimination_constraints = pyo.ConstraintList()
-
-        sorted_sets = {}
-
-        for set in customer_powerset:
-            if len(set) in sorted_sets:
-                sorted_sets[len(set)].append(set)
-
-            else:
-                sorted_sets[len(set)] = [set]
-
-        for key, value in sorted_sets.items():
-            setattr(model, f'set_dim_{key}', pyo.Set(dimen=key, initialize=value))
-
-        for key in sorted_sets:
-            set = getattr(model, f'set_dim_{key}')
-            for subset in set:
-                try:
-                    model.subset_elimination_constraints.add(subset_elimination(model, subset))
-                except ValueError:
-                    continue
-
-        model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
+        build_model(model)
 
         start_time = time.time()
         # model.write('model.lp')
         result = opt.solve(model)
 
         for joker in model.joker:
-            if math.isclose(model.joker[joker].value, 1, rel_tol=1e-9):
+            if math.isclose(model.joker[joker].value, 1, rel_tol=1e-6):
                 exceptions.append(joker)
                 print(joker)
 
-        if exceptions:
-            result = opt.solve(model)
+        while True:
+            if exceptions:
+                build_model(model)
+                result = opt.solve(model)
+                exceptions = []
+
+            for joker in model.joker:
+                if math.isclose(model.joker[joker].value, 1, rel_tol=1e-6):
+                    exceptions.append(joker)
+
+            if exceptions:
+                print("retry")
+            else:
+                break
+
 
         connections = []
         starts = []
         for pair in model.valid_pairs:
-            if math.isclose(model.customer_customer[pair].value, 1, rel_tol=1e-9):
+            if math.isclose(model.customer_customer[pair].value, 1, rel_tol=1e-6):
                 connections.append(pair)
 
         for vehicle in model.vehicles:
             for customer in model.customers:
-                if math.isclose(model.vehicle_customer[vehicle, customer].value, 1, rel_tol=1e-9):
+                if math.isclose(model.vehicle_customer[vehicle, customer].value, 1, rel_tol=1e-6):
                     starts.append((vehicle, customer))
 
-        print(connections)
-        print(starts)
-        print(pyo.value(model.loss))
-        
-print(r_json)
-# r_json = json.loads(r.content.decode())
-# r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
-# r_json = json.loads(r.content.decode())
-# get scenario_id...
-# r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        #print(connections)
+        #print(starts)
+        #print(pyo.value(model.loss))
+
+        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
+        r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        wait_times = update_scenario(starts, connections, scenario_id, speed)
+
+        #print(wait_times)
+        print(f"solver: {calculate_score(wait_times, customer_distances_dict)}, random: {0}")
+
+        random_payload = randomized_payload(vehicles, customers)
+
+        r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
+        r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
+        #wait_times = update_scenario(starts, connections, scenario_id, speed)
+
