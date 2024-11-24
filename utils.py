@@ -67,9 +67,8 @@ def randomized_payload(cars, customers):
     for i in range(len(customers_copy)):
         random_car = random.randint(0, cars_len - 1)
         random_customer = random.randint(0, len(customers_copy) - 1)
-        customers_copy.pop(random_customer)
         payload["vehicles"].append({"id": cars[random_car]["id"], "customerId": customers_copy[random_customer]["id"]})
-        customers_copy.remove(random_customer)
+        customers_copy.pop(random_customer)
 
     return payload
 
