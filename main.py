@@ -263,6 +263,7 @@ if True:
         # create scenario
         r = requests.post("http://localhost:8080/scenario/create")
         r_json = json.loads(r.content.decode())
+        scenario_json = r_json
         scenario_id = r_json["id"]
 
         # initialize scenario (default values)
@@ -414,3 +415,10 @@ if True:
         print(connections)
         print(starts)
         print(pyo.value(model.loss))
+        
+print(r_json)
+# r_json = json.loads(r.content.decode())
+# r = requests.post("http://localhost:8090/Scenarios/initialize_scenario", json=r_json)
+# r_json = json.loads(r.content.decode())
+# get scenario_id...
+# r = requests.post(f"http://localhost:8090/Runner/launch_scenario/{scenario_id}?speed={speed}")
