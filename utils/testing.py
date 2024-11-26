@@ -1,6 +1,5 @@
-import requests
 import orfuncs
-import json
+
 
 def distance_optimize(vehicles, customers):
     # THIS IS THE OPTIMIZER

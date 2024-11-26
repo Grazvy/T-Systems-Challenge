@@ -3,8 +3,7 @@ import requests
 import json
 import math
 import time
-from utils import calculate_distance, plot_distance_distribution, update_scenario, update_scenario_dist, randomized_payload
-from testing import distance_optimize
+from utils.utils import calculate_distance, update_scenario, update_scenario_dist, randomized_payload
 from itertools import chain, combinations
 import logging
 
