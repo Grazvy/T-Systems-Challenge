@@ -37,14 +37,14 @@ def calculate_score(wait_times, distances_dict):
 
     return score
 
-collect_data = True
+collect_data = False
 speed = 0.001
-amount_v = 5
-amount_c = 10
+amount_v = 10
+amount_c = 20
 model = pyo.ConcreteModel(name="Scheduler")
 opt = pyo.SolverFactory('appsi_highs')  # glpk, cbc, appsi_highs
-opt.options["threads"] = 1
-radius = 2000
+opt.options["threads"] = 32
+radius = 100
 exceptions = []
 
 """
@@ -309,8 +309,9 @@ def loss(model):
 model.loss = pyo.Objective(rule=loss, sense=pyo.minimize, doc="loss")
 
 
-start_time = time.time()
+
 if not collect_data:
+    start_time = time.time()
     model.write('_model.lp')
 
 result = opt.solve(model)
@@ -338,13 +339,12 @@ for vehicle in model.vehicles:
 
 #wait_times = update_scenario(starts, connections, scenario_id, speed)
 
-# timing
-end_time = time.time()
-elapsed_time = end_time - start_time
-minutes = int(elapsed_time // 60)
-seconds = int(elapsed_time % 60)
-
 if not collect_data:
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    minutes = int(elapsed_time // 60)
+    seconds = int(elapsed_time % 60)
+
     print(f"\n{minutes}:{seconds}")
 
 if collect_data:
