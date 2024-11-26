@@ -337,7 +337,27 @@ for vehicle in model.vehicles:
             starts.append((vehicle, customer))
 
 
-#wait_times = update_scenario(starts, connections, scenario_id, speed)
+print("Starts (Vehicle -> Customer):")
+for s in starts:
+    print(s[0][:6] + " --> " + s[1][:6])
+    
+print()
+    
+print("Connections (Customer -> Customer):")
+for c in connections:
+    print(c[0][:6] + " --> " + c[1][:6])
+
+print()
+
+wait_times = update_scenario(starts, connections, scenario_id, speed)
+print()
+print(f"Final Score: {calculate_score(wait_times, customer_distances_dict)}")
+
+test_scores = [3219157.550493392, 2732000, 3626000, 2128000, 2446000, 3536000, 2710000, 3930000, 4232000, 4292000, 3220380.605176285, 2970000, 3726000, 2533460.021475995, 3302262.1820069975, 2934000, 2924000, 3326000, 3132714.785188478, 4482000]
+print(f"Average Scores (testing): {sum(test_scores) / len(test_scores)}")
+
+random_scores = [6868000, 10567014.81795604, 7146000, 7572000, 7680000, 7176455.035555141, 8254000, 5641999.312590837, 6147638.373011272, 13873513.48782336, 6942000, 9413235.489025157, 8402000, 5336000, 9676000, 7796000, 11659198.093317661, 9220514.309734384, 8244962.554841987, 8592636.830676384]
+print(f"Average Scores (random): {sum(test_scores) / len(test_scores)}")
 
 if not collect_data:
     end_time = time.time()
