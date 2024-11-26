@@ -357,7 +357,7 @@ test_scores = [3219157.550493392, 2732000, 3626000, 2128000, 2446000, 3536000, 2
 print(f"Average Scores (testing): {sum(test_scores) / len(test_scores)}")
 
 random_scores = [6868000, 10567014.81795604, 7146000, 7572000, 7680000, 7176455.035555141, 8254000, 5641999.312590837, 6147638.373011272, 13873513.48782336, 6942000, 9413235.489025157, 8402000, 5336000, 9676000, 7796000, 11659198.093317661, 9220514.309734384, 8244962.554841987, 8592636.830676384]
-print(f"Average Scores (random): {sum(test_scores) / len(test_scores)}")
+print(f"Average Scores (random): {sum(random_scores) / len(random_scores)}")
 
 if not collect_data:
     end_time = time.time()

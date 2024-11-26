@@ -1,3 +1,5 @@
+### This is the backend for our project at hackaTUM 2024
+
 ## Usage
 - `pip install -r requirements.txt`
 - `python3 main.py`
